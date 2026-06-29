@@ -1,0 +1,1281 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>محاسبه قیمت چاپ — محمد رضوی v2</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f0f1a;
+    --surface: #1a1a2e;
+    --surface2: #22223a;
+    --border: #2e2e4a;
+    --gold: #e8a020;
+    --gold-light: #f5c050;
+    --text: #f0f0f0;
+    --text-muted: #888;
+    --text-dim: #bbb;
+    --radius: 10px;
+    --green: #4caf50;
+  }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: Tahoma, 'Segoe UI', sans-serif;
+    min-height: 100vh;
+    padding-bottom: 60px;
+  }
+
+  /* ===== HEADER ===== */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 16px;
+    text-align: center;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+  header h1 { font-size: 16px; font-weight: 600; color: var(--gold); }
+  header p { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .settings-btn {
+    position: absolute;
+    left: 14px;
+    background: none;
+    border: none;
+    font-size: 22px;
+    cursor: pointer;
+    color: var(--gold);
+    padding: 4px 6px;
+    border-radius: 8px;
+    transition: background 0.2s;
+    line-height: 1;
+  }
+  .settings-btn:hover { background: var(--surface2); }
+
+  /* ===== SETTINGS DRAWER ===== */
+  .settings-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 200;
+    animation: fadeIn 0.2s;
+  }
+  .settings-overlay.open { display: block; }
+  @keyframes fadeIn { from { opacity:0 } to { opacity:1 } }
+  .settings-panel {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    bottom: 0;
+    background: var(--bg);
+    z-index: 300;
+    overflow-y: auto;
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(.4,0,.2,1);
+    max-width: 480px;
+  }
+  .settings-panel.open { transform: translateX(0); }
+  .settings-header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .settings-header h2 { font-size: 17px; color: var(--gold); }
+  .close-btn {
+    background: none;
+    border: none;
+    font-size: 22px;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 8px;
+    transition: background 0.2s;
+  }
+  .close-btn:hover { background: var(--surface2); color: var(--text); }
+  .save-settings-btn {
+    width: calc(100% - 32px);
+    margin: 16px;
+    background: var(--gold);
+    color: #111;
+    border: none;
+    border-radius: var(--radius);
+    padding: 12px;
+    font-size: 15px;
+    font-weight: 700;
+    font-family: Tahoma, sans-serif;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .save-settings-btn:hover { background: var(--gold-light); }
+  .save-notice {
+    text-align: center;
+    font-size: 13px;
+    color: var(--green);
+    padding: 0 16px 12px;
+    display: none;
+  }
+  .save-notice.show { display: block; animation: fadeIn 0.3s; }
+
+  /* ===== GENERAL COMPONENTS ===== */
+  .container { max-width: 480px; margin: 0 auto; padding: 14px; }
+  .section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 12px;
+    overflow: hidden;
+    animation: slideUp 0.2s ease;
+  }
+  @keyframes slideUp { from { opacity:0; transform:translateY(8px) } to { opacity:1; transform:none } }
+  .section-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--gold-light);
+    padding: 11px 14px 9px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .section-title .icon { font-size: 17px; }
+  .field {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--border);
+    gap: 10px;
+  }
+  .field:last-child { border-bottom: none; }
+  .field label { font-size: 15px; color: var(--text-dim); white-space: nowrap; }
+  .field-stack {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .field-stack:last-child { border-bottom: none; }
+  .dim-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .dim-row:last-child { margin-bottom: 0; }
+  .dim-row label { font-size: 15px; color: var(--text-dim); }
+
+  /* ===== INPUTS ===== */
+  input[type="text"], select {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: Tahoma, sans-serif;
+    font-size: 15px;
+    padding: 7px 10px;
+    text-align: left;
+    direction: ltr;
+    outline: none;
+    width: 140px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .dim-row input { width: 120px; }
+  input[type="text"]:focus, select:focus {
+    border-color: var(--gold);
+    box-shadow: 0 0 0 2px rgba(232,160,32,0.15);
+  }
+  select { cursor: pointer; }
+  select option { background: var(--surface); }
+  /* عدد‌ساز — نمایش با ویرگول ولی ذخیره خالص */
+  .num-input {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: 'Courier New', monospace;
+    font-size: 15px;
+    padding: 7px 10px;
+    text-align: right;
+    direction: ltr;
+    outline: none;
+    width: 140px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .num-input:focus {
+    border-color: var(--gold);
+    box-shadow: 0 0 0 2px rgba(232,160,32,0.15);
+  }
+  .dim-row .num-input { width: 120px; }
+
+  /* ===== TOGGLE ===== */
+  .toggle-field {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+  }
+  .toggle-field:last-child { border-bottom: none; }
+  .toggle-field:active { background: var(--surface2); }
+  .toggle-field label { font-size: 15px; color: var(--text-dim); cursor: pointer; }
+  .toggle {
+    width: 40px; height: 22px;
+    border-radius: 11px;
+    background: var(--border);
+    position: relative;
+    transition: background 0.2s;
+    flex-shrink: 0;
+  }
+  .toggle.on { background: var(--gold); }
+  .toggle::after {
+    content: '';
+    position: absolute;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: white;
+    top: 3px; right: 3px;
+    transition: transform 0.2s;
+  }
+  .toggle.on::after { transform: translateX(-18px); }
+
+  /* ===== RESULT BOX ===== */
+  .result-box {
+    background: var(--surface);
+    border: 1px solid var(--gold);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    margin-bottom: 12px;
+    animation: slideUp 0.3s ease;
+  }
+  .result-label { font-size: 13px; color: var(--text-muted); margin-bottom: 4px; text-align: center; }
+  .result-total {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--gold-light);
+    direction: ltr;
+    letter-spacing: -0.5px;
+    text-align: center;
+    font-family: 'Courier New', monospace;
+  }
+  .result-unit { font-size: 13px; color: var(--text-muted); margin-top: 3px; text-align: center; }
+  .result-divider {
+    text-align: center;
+    color: var(--gold);
+    font-size: 13px;
+    letter-spacing: 1px;
+    margin: 12px 0 8px;
+    font-family: 'Courier New', monospace;
+    opacity: 0.6;
+  }
+  .result-breakdown { margin-top: 2px; }
+  .breakdown-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 4px;
+    font-size: 14px;
+    border-bottom: 1px solid #1e1e30;
+  }
+  .breakdown-row:last-child { border-bottom: none; }
+  .breakdown-row span:first-child { color: var(--text-muted); }
+  .breakdown-row span:last-child {
+    color: var(--text-dim);
+    direction: ltr;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    min-width: 130px;
+    text-align: left;
+  }
+  .breakdown-row.zero span:last-child { color: #3a3a5a; }
+
+  /* ===== BUTTONS ===== */
+  .calc-btn {
+    width: 100%;
+    background: var(--gold);
+    color: #111;
+    border: none;
+    border-radius: var(--radius);
+    padding: 13px;
+    font-size: 15px;
+    font-weight: 700;
+    font-family: Tahoma, sans-serif;
+    cursor: pointer;
+    margin-bottom: 12px;
+    transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
+    box-shadow: 0 2px 12px rgba(232,160,32,0.3);
+  }
+  .calc-btn:hover { background: var(--gold-light); box-shadow: 0 4px 18px rgba(232,160,32,0.4); }
+  .calc-btn:active { transform: scale(0.98); }
+  .reset-btn {
+    width: 100%;
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px;
+    font-size: 15px;
+    font-family: Tahoma, sans-serif;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+  .reset-btn:hover { border-color: var(--text-muted); color: var(--text-dim); }
+  .manual-note {
+    font-size: 12px;
+    color: #555;
+    text-align: center;
+    margin-top: 8px;
+  }
+
+  /* ===== INFO ROWS ===== */
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 7px 14px;
+    font-size: 13px;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+  }
+  .info-row:last-child { border-bottom: none; }
+  .info-row span:last-child {
+    color: var(--gold);
+    direction: ltr;
+    font-family: 'Courier New', monospace;
+  }
+
+  /* ===== SETTINGS INPUT UNIT ===== */
+  .setting-unit {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+    text-align: right;
+    direction: ltr;
+  }
+  .field-col {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+  }
+</style>
+</head>
+<body>
+
+<!-- هدر -->
+<header>
+  <div style="flex:1"></div>
+  <div style="text-align:center">
+    <h1>محاسبه قیمت چاپ و بسته‌بندی</h1>
+    <p>محمد رضوی — v2.0</p>
+  </div>
+  <div style="flex:1; display:flex; justify-content:flex-end">
+    <button class="settings-btn" onclick="openSettings()" title="تنظیمات">⚙️</button>
+  </div>
+</header>
+
+<!-- پنل تنظیمات -->
+<div class="settings-overlay" id="settingsOverlay" onclick="closeSettings()"></div>
+<div class="settings-panel" id="settingsPanel">
+  <div class="settings-header">
+    <h2>⚙️ تنظیمات قیمت‌ها</h2>
+    <button class="close-btn" onclick="closeSettings()">✕</button>
+  </div>
+  <div style="padding: 12px 16px 0;">
+
+    <!-- قیمت مقوا -->
+    <div class="section">
+      <div class="section-title"><span class="icon">📦</span> قیمت مقوا (ریال/کیلو)</div>
+      <div class="field">
+        <label>In.Rasha</label>
+        <div class="field-col">
+          <input class="num-input" id="s_card_in_rasha" value="100,000">
+        </div>
+      </div>
+      <div class="field">
+        <label>In.Ningbo</label>
+        <div class="field-col">
+          <input class="num-input" id="s_card_in_ningbo" value="200,000">
+        </div>
+      </div>
+      <div class="field">
+        <label>Po.Rasha</label>
+        <div class="field-col">
+          <input class="num-input" id="s_card_po_rasha" value="300,000">
+        </div>
+      </div>
+      <div class="field">
+        <label>Po.Koreh</label>
+        <div class="field-col">
+          <input class="num-input" id="s_card_po_koreh" value="400,000">
+        </div>
+      </div>
+    </div>
+
+    <!-- قیمت چاپ -->
+    <div class="section">
+      <div class="section-title"><span class="icon">🖨️</span> قیمت چاپ (ریال/دور)</div>
+      <div class="field">
+        <label>GTO</label>
+        <div class="field-col">
+          <input class="num-input" id="s_print_gto" value="70,000,000">
+        </div>
+      </div>
+      <div class="field">
+        <label>۲ ورقی</label>
+        <div class="field-col">
+          <input class="num-input" id="s_print_two" value="130,000,000">
+        </div>
+      </div>
+      <div class="field">
+        <label>۴/۵ ورقی</label>
+        <div class="field-col">
+          <input class="num-input" id="s_print_four" value="200,000,000">
+        </div>
+      </div>
+    </div>
+
+    <!-- قیمت پلیت -->
+    <div class="section">
+      <div class="section-title"><span class="icon">🔲</span> قیمت پلیت (ریال/رنگ)</div>
+      <div class="field">
+        <label>پلیت GTO</label>
+        <div class="field-col">
+          <input class="num-input" id="s_plate_gto" value="400,000">
+        </div>
+      </div>
+      <div class="field">
+        <label>پلیت ۲ ورقی</label>
+        <div class="field-col">
+          <input class="num-input" id="s_plate_two" value="500,000">
+        </div>
+      </div>
+      <div class="field">
+        <label>پلیت ۴/۵ ورقی</label>
+        <div class="field-col">
+          <input class="num-input" id="s_plate_four" value="600,000">
+        </div>
+      </div>
+    </div>
+
+    <!-- قیمت مرکب -->
+    <div class="section">
+      <div class="section-title"><span class="icon">🎨</span> قیمت مرکب (ریال/شیت/رنگ)</div>
+      <div class="field">
+        <label>فی مرکب</label>
+        <div class="field-col">
+          <input class="num-input" id="s_ink" value="19,500">
+        </div>
+      </div>
+    </div>
+
+    <!-- قیمت سلفون -->
+    <div class="section">
+      <div class="section-title"><span class="icon">✨</span> قیمت سلفون (ریال/سانتی‌متر مربع)</div>
+      <div class="field">
+        <label>فی سلفون</label>
+        <div class="field-col">
+          <input class="num-input" id="s_selfon" value="250">
+        </div>
+      </div>
+    </div>
+
+    <!-- قیمت طلاکوب -->
+    <div class="section">
+      <div class="section-title"><span class="icon">⭐</span> قیمت طلاکوب (ریال/دور)</div>
+      <div class="field">
+        <label>فی هاتفویل</label>
+        <div class="field-col">
+          <input class="num-input" id="s_foil" value="7,500,000">
+        </div>
+      </div>
+    </div>
+
+    <!-- قیمت دایکات -->
+    <div class="section">
+      <div class="section-title"><span class="icon">✂️</span> قیمت دایکات (ریال/ضرب)</div>
+      <div class="field">
+        <label>فی ضرب</label>
+        <div class="field-col">
+          <input class="num-input" id="s_diecut" value="10,000">
+        </div>
+      </div>
+    </div>
+
+    <!-- قیمت چسب / لب چسب -->
+    <div class="section">
+      <div class="section-title"><span class="icon">🗂️</span> قیمت چسب — لب چسب (ریال/جعبه)</div>
+      <div class="field">
+        <label>کوچک (تا ۵۰mm)</label>
+        <div class="field-col">
+          <input class="num-input" id="s_glue_small" value="2,000">
+        </div>
+      </div>
+      <div class="field">
+        <label>متوسط (تا ۱۰۰mm)</label>
+        <div class="field-col">
+          <input class="num-input" id="s_glue_mid" value="4,000">
+        </div>
+      </div>
+      <div class="field">
+        <label>بزرگ (بیشتر از ۱۰۰mm)</label>
+        <div class="field-col">
+          <input class="num-input" id="s_glue_large" value="7,000">
+        </div>
+      </div>
+    </div>
+
+    <!-- قیمت لاک باتم -->
+    <div class="section">
+      <div class="section-title"><span class="icon">🔒</span> قیمت لاک باتم (ریال/جعبه)</div>
+      <div class="field">
+        <label>کوچک (تا ۲۰mm)</label>
+        <div class="field-col">
+          <input class="num-input" id="s_lock_small" value="5,000">
+        </div>
+      </div>
+      <div class="field">
+        <label>متوسط (تا ۳۵mm)</label>
+        <div class="field-col">
+          <input class="num-input" id="s_lock_mid" value="7,000">
+        </div>
+      </div>
+      <div class="field">
+        <label>بزرگ (بیشتر از ۳۵mm)</label>
+        <div class="field-col">
+          <input class="num-input" id="s_lock_large" value="12,000">
+        </div>
+      </div>
+    </div>
+
+    <!-- ابعاد شیت ماشین‌ها -->
+    <div class="section">
+      <div class="section-title"><span class="icon">📐</span> ابعاد شیت ماشین‌ها (cm)</div>
+      <div class="field">
+        <label>GTO — شیت چاپی</label>
+        <div class="field-col">
+          <input class="num-input" id="s_sz_gto_w" value="70" style="width:65px;"> × <input class="num-input" id="s_sz_gto_h" value="45" style="width:65px; margin-right:4px;">
+        </div>
+      </div>
+      <div class="field">
+        <label>۲ ورقی — شیت چاپی</label>
+        <div class="field-col" style="flex-direction:row; align-items:center; gap:4px;">
+          <input class="num-input" id="s_sz_two_w" value="52" style="width:65px;"> × <input class="num-input" id="s_sz_two_h" value="72" style="width:65px;">
+        </div>
+      </div>
+      <div class="field">
+        <label>۴/۵ ورقی — شیت چاپی</label>
+        <div class="field-col" style="flex-direction:row; align-items:center; gap:4px;">
+          <input class="num-input" id="s_sz_four_w" value="70" style="width:65px;"> × <input class="num-input" id="s_sz_four_h" value="45" style="width:65px;">
+        </div>
+      </div>
+    </div>
+
+    <!-- درصد ضایعات و سود -->
+    <div class="section">
+      <div class="section-title"><span class="icon">📊</span> درصدها</div>
+      <div class="field">
+        <label>درصد ضایعات (%)</label>
+        <div class="field-col">
+          <input class="num-input" id="s_waste_pct" value="5" style="width:80px;">
+        </div>
+      </div>
+      <div class="field">
+        <label>درصد سود (%)</label>
+        <div class="field-col">
+          <input class="num-input" id="s_profit_pct" value="15" style="width:80px;">
+        </div>
+      </div>
+    </div>
+
+  </div>
+  <button class="save-settings-btn" onclick="saveSettings()">💾 ذخیره تنظیمات</button>
+  <p class="save-notice" id="saveNotice">✅ تنظیمات ذخیره شد</p>
+</div>
+
+<!-- محتوای اصلی -->
+<div class="container">
+
+  <!-- داده‌های مشتری -->
+  <div class="section">
+    <div class="section-title"><span class="icon">📋</span> داده‌های سفارش</div>
+    <div class="field">
+      <label>تعداد سفارش</label>
+      <input class="num-input" id="qty" value="30,000">
+    </div>
+    <div class="field">
+      <label>جنس مقوا</label>
+      <select id="cardboard_type" onchange="updateBrand()">
+        <option value="Inderbord">Inderbord</option>
+        <option value="PoshtTosi">PoshtTosi</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>برند مقوا</label>
+      <select id="cardboard_brand">
+        <option value="In.Rasha">In.Rasha</option>
+        <option value="In.Ningbo">In.Ningbo</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>گرماژ مقوا (gr)</label>
+      <select id="grammage">
+        <option value="180">180</option>
+        <option value="200">200</option>
+        <option value="210">210</option>
+        <option value="220">220</option>
+        <option value="230" selected>230</option>
+        <option value="250">250</option>
+        <option value="270">270</option>
+        <option value="280">280</option>
+        <option value="300">300</option>
+        <option value="350">350</option>
+        <option value="400">400</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>تعداد رنگ</label>
+      <input class="num-input" id="colors" value="5" style="width:80px;">
+    </div>
+  </div>
+
+  <!-- ابعاد -->
+  <div class="section">
+    <div class="section-title"><span class="icon">📐</span> ابعاد جعبه (میلی‌متر)</div>
+    <div class="field-stack">
+      <div class="dim-row">
+        <label>طول</label>
+        <input class="num-input" id="dim_l" value="80">
+      </div>
+      <div class="dim-row">
+        <label>عرض</label>
+        <input class="num-input" id="dim_w" value="50">
+      </div>
+      <div class="dim-row">
+        <label>ارتفاع</label>
+        <input class="num-input" id="dim_h" value="120">
+      </div>
+    </div>
+  </div>
+
+  <!-- ماشین چاپ -->
+  <div class="section">
+    <div class="section-title"><span class="icon">🏭</span> ماشین چاپ</div>
+    <div class="field">
+      <label>نوع ماشین</label>
+      <select id="machine" onchange="updateSheetSize()">
+        <option value="gto">GTO</option>
+        <option value="two">۲ ورقی</option>
+        <option value="four" selected>۴/۵ ورقی</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>شیت سایز مرجع (cm)</label>
+      <div style="display:flex; align-items:center; gap:5px; direction:ltr;">
+        <input class="num-input" type="text" id="sheet_ref_w" value="70" style="width:55px; text-align:center;" oninput="detectMachineFromSize()">
+        <span style="color:var(--text-muted); font-size:15px;">×</span>
+        <input class="num-input" type="text" id="sheet_ref_h" value="90" style="width:55px; text-align:center;" oninput="detectMachineFromSize()">
+      </div>
+    </div>
+    <div class="field">
+      <label>شیت سایز چاپی (cm)</label>
+      <div style="display:flex; align-items:center; gap:5px; direction:ltr;">
+        <input class="num-input" type="text" id="sheet_print_w" value="70" style="width:55px; text-align:center;" oninput="detectMachineFromSize()">
+        <span style="color:var(--text-muted); font-size:15px;">×</span>
+        <input class="num-input" type="text" id="sheet_print_h" value="45" style="width:55px; text-align:center;" oninput="detectMachineFromSize()">
+      </div>
+    </div>
+    <div class="field" style="padding:5px 14px 8px;">
+      <span style="font-size:13px; color:var(--text-muted);">تشخیص خودکار</span>
+      <span id="machine_detect_badge" style="font-size:13px; color:var(--gold); font-family:'Courier New',monospace;">—</span>
+    </div>
+    <div class="field">
+      <label>تعداد محصول در شیت</label>
+      <input class="num-input" id="per_sheet" value="10" style="width:80px;">
+    </div>
+  </div>
+
+  <!-- خدمات -->
+  <div class="section">
+    <div class="section-title"><span class="icon">🔧</span> خدمات</div>
+    <div class="toggle-field" onclick="toggleService('selfon')">
+      <label>سلفون</label>
+      <div class="toggle on" id="t_selfon"></div>
+    </div>
+    <div class="field" id="f_selfon">
+      <label>نوع سلفون</label>
+      <select id="selfon_type">
+        <option value="mat">مات</option>
+        <option value="bright">براق</option>
+        <option value="velvet">مخملی</option>
+      </select>
+    </div>
+    <div class="toggle-field" onclick="toggleService('varnish')">
+      <label>پوشش ورنی</label>
+      <div class="toggle on" id="t_varnish"></div>
+    </div>
+    <div class="toggle-field" onclick="toggleService('uv_cyl')">
+      <label>یووی سیلندری</label>
+      <div class="toggle on" id="t_uv_cyl"></div>
+    </div>
+    <div class="toggle-field" onclick="toggleService('foil')">
+      <label>طلاکوب / نقره‌کوب</label>
+      <div class="toggle on" id="t_foil"></div>
+    </div>
+    <div class="field-stack" id="f_foil">
+      <div class="dim-row">
+        <label>ارتفاع کلیشه طلا (cm)</label>
+        <input class="num-input" id="foil_h" value="7" style="width:120px;">
+      </div>
+      <div class="dim-row">
+        <label>عرض کلیشه طلا (cm)</label>
+        <input class="num-input" id="foil_w" value="9" style="width:120px;">
+      </div>
+    </div>
+    <div class="toggle-field" onclick="toggleService('emboss')">
+      <label>برجسته</label>
+      <div class="toggle on" id="t_emboss"></div>
+    </div>
+    <div class="toggle-field" onclick="toggleService('diecut')">
+      <label>قالب (دایکات)</label>
+      <div class="toggle on" id="t_diecut"></div>
+    </div>
+    <div class="toggle-field" onclick="toggleService('uv_spot')">
+      <label>یووی موضعی</label>
+      <div class="toggle" id="t_uv_spot"></div>
+    </div>
+    <div class="toggle-field" onclick="toggleService('hybrid')">
+      <label>هایبرید</label>
+      <div class="toggle on" id="t_hybrid"></div>
+    </div>
+  </div>
+
+  <!-- هزینه‌های ثابت -->
+  <div class="section">
+    <div class="section-title"><span class="icon">💰</span> هزینه‌های ثابت (ریال)</div>
+    <div class="field">
+      <label>هزینه قالب</label>
+      <input class="num-input" id="cost_diecut_mold" value="120,000,000">
+    </div>
+    <div class="field">
+      <label>هزینه کلیشه برجسته</label>
+      <input class="num-input" id="cost_emboss_plate" value="200,000,000">
+    </div>
+    <div class="field">
+      <label>هزینه فیلم موضعی</label>
+      <input class="num-input" id="cost_uv_film" value="50,000,000">
+    </div>
+    <div class="field">
+      <label>هزینه برجسته</label>
+      <input class="num-input" id="cost_emboss" value="100,000,000">
+    </div>
+    <div class="field">
+      <label>هزینه یووی موضعی</label>
+      <input class="num-input" id="cost_uv_spot_manual" value="0">
+    </div>
+  </div>
+
+  <!-- دکمه محاسبه -->
+  <button class="calc-btn" onclick="calculate()">🧮 محاسبه قیمت</button>
+
+  <!-- نتیجه -->
+  <div class="result-box" id="resultBox">
+    <div class="result-label">قیمت کل</div>
+    <div class="result-total" id="result_total">—</div>
+    <div class="result-unit">ریال</div>
+    <div class="result-divider" id="result_divider">══════════════════════</div>
+    <div class="result-breakdown">
+      <div class="breakdown-row" id="row_cardboard"><span>📦 هزینه مقوا</span><span id="r_cardboard">—</span></div>
+      <div class="breakdown-row" id="row_plate"><span>🔲 هزینه پلیت</span><span id="r_plate">—</span></div>
+      <div class="breakdown-row" id="row_print"><span>🖨️ هزینه چاپ</span><span id="r_print">—</span></div>
+      <div class="breakdown-row" id="row_ink"><span>🎨 هزینه رنگ</span><span id="r_ink">—</span></div>
+      <div class="breakdown-row" id="row_selfon"><span>✨ هزینه سلفون</span><span id="r_selfon">—</span></div>
+      <div class="breakdown-row" id="row_foil"><span>⭐ هزینه طلاکوب</span><span id="r_foil">—</span></div>
+      <div class="breakdown-row" id="row_emboss"><span>🔺 هزینه برجسته</span><span id="r_emboss">—</span></div>
+      <div class="breakdown-row" id="row_mold"><span>🔩 هزینه قالبسازی</span><span id="r_mold">—</span></div>
+      <div class="breakdown-row" id="row_diecut"><span>✂️ هزینه دایکات</span><span id="r_diecut">—</span></div>
+      <div class="breakdown-row" id="row_glue"><span>🗂️ هزینه چسب</span><span id="r_glue">—</span></div>
+      <div class="breakdown-row" id="row_uv"><span>💡 هزینه یووی موضعی</span><span id="r_uv_spot">—</span></div>
+    </div>
+  </div>
+
+  <!-- داده‌های محاسباتی -->
+  <div class="section">
+    <div class="section-title"><span class="icon">📊</span> داده‌های محاسباتی</div>
+    <div class="info-row"><span>تعداد شیت چاپی</span><span id="i_sheets">—</span></div>
+    <div class="info-row"><span>تعداد مرکب</span><span id="i_ink_count">—</span></div>
+    <div class="info-row"><span>رند به پالت</span><span id="i_pallet">—</span></div>
+  </div>
+
+  <button class="reset-btn" onclick="resetForm()">🗑️ پاک کردن فرم</button>
+  <p class="manual-note">هزینه‌های برجسته، یووی موضعی، و فیلم بصورت دستی وارد می‌شوند</p>
+
+  <!-- ذخیره سفارش -->
+  <div id="save-order-area" style="display:none; margin-top:14px;">
+    <div style="display:flex; gap:8px; align-items:center;">
+      <input type="text" id="order_name" placeholder="نام سفارش..." style="flex:1; text-align:right; direction:rtl; font-family:Tahoma,sans-serif;">
+      <button onclick="saveOrder()" style="background:var(--gold); color:#111; border:none; border-radius:8px; padding:8px 14px; font-size:14px; font-weight:700; font-family:Tahoma,sans-serif; cursor:pointer; white-space:nowrap;">💾 ذخیره</button>
+    </div>
+  </div>
+
+  <!-- لیست سفارشات ذخیره‌شده -->
+  <div id="saved-orders-section" style="margin-top:14px; display:none;">
+    <div class="section">
+      <div class="section-title"><span class="icon">📁</span> سفارشات ذخیره‌شده</div>
+      <div id="saved-orders-list"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ===== مقادیر پیش‌فرض تنظیمات =====
+const DEFAULT_SETTINGS = {
+  cardboard: { 'In.Rasha': 100000, 'In.Ningbo': 200000, 'Po.Rasha': 300000, 'Po.Koreh': 400000 },
+  print:  { gto: 70000000, two: 130000000, four: 200000000 },
+  plate:  { gto: 400000,   two: 500000,    four: 600000 },
+  selfon_per_cm2: 250,
+  foil_per_round: 7500000,
+  diecut_per_hit: 10000,
+  glue:  { small: 2000, mid: 4000, large: 7000 },
+  lock:  { small: 5000, mid: 7000, large: 12000 },
+  ink_per_color_per_sheet: 19500,
+  sheet_sizes: {
+    gto:  { ref: '70 × 90', w: 70, h: 45 },
+    two:  { ref: '52 × 72', w: 52, h: 72 },
+    four: { ref: '70 × 90', w: 70, h: 45 }
+  },
+  waste_pct: 5,
+  profit_pct: 15
+};
+
+let CFG = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+
+const services = {
+  selfon: true, varnish: true, uv_cyl: true,
+  foil: true, emboss: true, diecut: true,
+  uv_spot: false, hybrid: true
+};
+
+// ===== فرمت اعداد =====
+function fmt(n) {
+  if (isNaN(n) || n === null) return '—';
+  return Math.round(n).toLocaleString('en-US');
+}
+
+// تبدیل رشته با ویرگول به عدد
+function parseNum(str) {
+  if (typeof str === 'number') return str;
+  return parseFloat(String(str).replace(/,/g, '')) || 0;
+}
+
+// فرمت خودکار input هنگام تایپ
+function bindNumInput(el) {
+  el.addEventListener('input', function() {
+    const raw = this.value.replace(/,/g, '').replace(/[^\d]/g, '');
+    if (raw === '') { this.value = ''; return; }
+    const n = parseInt(raw, 10);
+    const pos = this.selectionStart;
+    const oldLen = this.value.length;
+    this.value = n.toLocaleString('en-US');
+    const diff = this.value.length - oldLen;
+    this.setSelectionRange(pos + diff, pos + diff);
+  });
+  el.addEventListener('blur', function() {
+    const raw = parseNum(this.value);
+    if (!isNaN(raw) && this.value !== '') this.value = raw.toLocaleString('en-US');
+  });
+}
+
+// ===== تنظیمات — باز/بسته =====
+function openSettings() {
+  loadSettingsToUI();
+  document.getElementById('settingsPanel').classList.add('open');
+  document.getElementById('settingsOverlay').classList.add('open');
+}
+function closeSettings() {
+  document.getElementById('settingsPanel').classList.remove('open');
+  document.getElementById('settingsOverlay').classList.remove('open');
+}
+
+function loadSettingsToUI() {
+  sv('s_card_in_rasha', CFG.cardboard['In.Rasha']);
+  sv('s_card_in_ningbo', CFG.cardboard['In.Ningbo']);
+  sv('s_card_po_rasha', CFG.cardboard['Po.Rasha']);
+  sv('s_card_po_koreh', CFG.cardboard['Po.Koreh']);
+  sv('s_print_gto', CFG.print.gto);
+  sv('s_print_two', CFG.print.two);
+  sv('s_print_four', CFG.print.four);
+  sv('s_plate_gto', CFG.plate.gto);
+  sv('s_plate_two', CFG.plate.two);
+  sv('s_plate_four', CFG.plate.four);
+  sv('s_ink', CFG.ink_per_color_per_sheet);
+  sv('s_selfon', CFG.selfon_per_cm2);
+  sv('s_foil', CFG.foil_per_round);
+  sv('s_diecut', CFG.diecut_per_hit);
+  sv('s_glue_small', CFG.glue.small);
+  sv('s_glue_mid', CFG.glue.mid);
+  sv('s_glue_large', CFG.glue.large);
+  sv('s_lock_small', CFG.lock.small);
+  sv('s_lock_mid', CFG.lock.mid);
+  sv('s_lock_large', CFG.lock.large);
+  sv('s_sz_gto_w', CFG.sheet_sizes.gto.w);
+  sv('s_sz_gto_h', CFG.sheet_sizes.gto.h);
+  sv('s_sz_two_w', CFG.sheet_sizes.two.w);
+  sv('s_sz_two_h', CFG.sheet_sizes.two.h);
+  sv('s_sz_four_w', CFG.sheet_sizes.four.w);
+  sv('s_sz_four_h', CFG.sheet_sizes.four.h);
+  sv('s_waste_pct', CFG.waste_pct);
+  sv('s_profit_pct', CFG.profit_pct);
+}
+
+function sv(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.value = Number(val).toLocaleString('en-US');
+}
+
+function saveSettings() {
+  CFG.cardboard['In.Rasha']  = parseNum(gv('s_card_in_rasha'));
+  CFG.cardboard['In.Ningbo'] = parseNum(gv('s_card_in_ningbo'));
+  CFG.cardboard['Po.Rasha']  = parseNum(gv('s_card_po_rasha'));
+  CFG.cardboard['Po.Koreh']  = parseNum(gv('s_card_po_koreh'));
+  CFG.print.gto  = parseNum(gv('s_print_gto'));
+  CFG.print.two  = parseNum(gv('s_print_two'));
+  CFG.print.four = parseNum(gv('s_print_four'));
+  CFG.plate.gto  = parseNum(gv('s_plate_gto'));
+  CFG.plate.two  = parseNum(gv('s_plate_two'));
+  CFG.plate.four = parseNum(gv('s_plate_four'));
+  CFG.ink_per_color_per_sheet = parseNum(gv('s_ink'));
+  CFG.selfon_per_cm2   = parseNum(gv('s_selfon'));
+  CFG.foil_per_round   = parseNum(gv('s_foil'));
+  CFG.diecut_per_hit   = parseNum(gv('s_diecut'));
+  CFG.glue.small = parseNum(gv('s_glue_small'));
+  CFG.glue.mid   = parseNum(gv('s_glue_mid'));
+  CFG.glue.large = parseNum(gv('s_glue_large'));
+  CFG.lock.small = parseNum(gv('s_lock_small'));
+  CFG.lock.mid   = parseNum(gv('s_lock_mid'));
+  CFG.lock.large = parseNum(gv('s_lock_large'));
+  CFG.sheet_sizes.gto.w  = parseNum(gv('s_sz_gto_w'));
+  CFG.sheet_sizes.gto.h  = parseNum(gv('s_sz_gto_h'));
+  CFG.sheet_sizes.two.w  = parseNum(gv('s_sz_two_w'));
+  CFG.sheet_sizes.two.h  = parseNum(gv('s_sz_two_h'));
+  CFG.sheet_sizes.four.w = parseNum(gv('s_sz_four_w'));
+  CFG.sheet_sizes.four.h = parseNum(gv('s_sz_four_h'));
+  CFG.waste_pct  = parseNum(gv('s_waste_pct'));
+  CFG.profit_pct = parseNum(gv('s_profit_pct'));
+
+  // ذخیره در localStorage
+  try { localStorage.setItem('printCFG_v2', JSON.stringify(CFG)); } catch(e){}
+
+  const notice = document.getElementById('saveNotice');
+  notice.classList.add('show');
+  setTimeout(() => notice.classList.remove('show'), 2500);
+}
+
+function gv(id) {
+  const el = document.getElementById(id);
+  return el ? el.value : '0';
+}
+
+function loadSettingsFromStorage() {
+  try {
+    const saved = localStorage.getItem('printCFG_v2');
+    if (saved) CFG = JSON.parse(saved);
+  } catch(e) {}
+}
+
+// ===== toggleService =====
+function toggleService(key) {
+  services[key] = !services[key];
+  const t = document.getElementById('t_' + key);
+  if (t) t.className = 'toggle ' + (services[key] ? 'on' : '');
+  const f = document.getElementById('f_' + key);
+  if (f) f.style.display = services[key] ? '' : 'none';
+}
+
+function updateBrand() {
+  const type = document.getElementById('cardboard_type').value;
+  const brand = document.getElementById('cardboard_brand');
+  brand.innerHTML = type === 'Inderbord'
+    ? '<option value="In.Rasha">In.Rasha</option><option value="In.Ningbo">In.Ningbo</option>'
+    : '<option value="Po.Rasha">Po.Rasha</option><option value="Po.Koreh">Po.Koreh</option>';
+}
+
+function updateSheetSize() {
+  const machine = document.getElementById('machine').value;
+  const s = CFG.sheet_sizes[machine];
+  // شیت مرجع
+  const refParts = (s.ref || (s.w + ' × ' + (s.h * 2))).replace(/\s/g,'').split('×');
+  document.getElementById('sheet_ref_w').value = refParts[0] || s.w;
+  document.getElementById('sheet_ref_h').value = refParts[1] || (s.h * 2);
+  // شیت چاپی
+  document.getElementById('sheet_print_w').value = s.w;
+  document.getElementById('sheet_print_h').value = s.h;
+  detectMachineFromSize();
+}
+
+// تشخیص نوع ماشین از روی سایز چاپی وارد شده
+function detectMachineFromSize() {
+  const w = parseFloat(document.getElementById('sheet_print_w').value) || 0;
+  const h = parseFloat(document.getElementById('sheet_print_h').value) || 0;
+  if (!w || !h) return;
+
+  // به‌روزرسانی CFG با مقادیر دستی برای ماشین فعلی
+  const machine = document.getElementById('machine').value;
+  CFG.sheet_sizes[machine].w = w;
+  CFG.sheet_sizes[machine].h = h;
+
+  // تشخیص خودکار نوع ماشین بر اساس سایز
+  // GTO: تا ۳۵×۵۰ | ۲ورقی: تا ۵۰×۷۰ | ۴/۵ورقی: بزرگتر
+  const maxSide = Math.max(w, h);
+  const minSide = Math.min(w, h);
+  let detected = 'four';
+  if (minSide <= 35 && maxSide <= 50) detected = 'gto';
+  else if (minSide <= 50 && maxSide <= 70) detected = 'two';
+
+  const badge = document.getElementById('machine_detect_badge');
+  const names = { gto: 'GTO', two: '۲ ورقی', four: '۴/۵ ورقی' };
+  if (badge) {
+    badge.textContent = '← تشخیص: ' + names[detected];
+    badge.style.color = 'var(--gold)';
+  }
+}
+
+// ===== محاسبه =====
+function calculate() {
+  const qty       = parseNum(document.getElementById('qty').value) || 0;
+  const brand     = document.getElementById('cardboard_brand').value;
+  const grammage  = parseInt(document.getElementById('grammage').value) || 230;
+  const colors    = parseNum(document.getElementById('colors').value) || 4;
+  const machine   = document.getElementById('machine').value;
+  const per_sheet = parseNum(document.getElementById('per_sheet').value) || 1;
+  const dim_w     = parseNum(document.getElementById('dim_w').value) || 50;
+
+  // خواندن سایز شیت از فیلدهای جدا
+  const sheet_w = parseFloat(document.getElementById('sheet_print_w').value) || CFG.sheet_sizes[machine].w;
+  const sheet_h = parseFloat(document.getElementById('sheet_print_h').value) || CFG.sheet_sizes[machine].h;
+
+  const sheets = Math.ceil(qty / per_sheet);
+
+  const weight_per_sheet = (sheet_w * sheet_h * grammage) / 10000000;
+  const cost_cardboard = weight_per_sheet * CFG.cardboard[brand] * sheets;
+
+  const cost_plate = CFG.plate[machine] * colors;
+  const cost_print = CFG.print[machine] * sheets;
+
+  const ink_count = Math.ceil(sheets / 1000) * colors;
+  const cost_ink  = ink_count * CFG.ink_per_color_per_sheet * 1000;
+
+  const cost_selfon = services.selfon
+    ? sheet_w * sheet_h * CFG.selfon_per_cm2 * sheets : 0;
+
+  const cost_foil = services.foil
+    ? CFG.foil_per_round * sheets : 0;
+
+  const cost_emboss = services.emboss
+    ? parseNum(document.getElementById('cost_emboss').value) : 0;
+  const cost_emboss_plate = services.emboss
+    ? parseNum(document.getElementById('cost_emboss_plate').value) : 0;
+
+  const cost_mold = services.diecut
+    ? parseNum(document.getElementById('cost_diecut_mold').value) : 0;
+  const cost_diecut = services.diecut
+    ? qty * CFG.diecut_per_hit : 0;
+
+  const glue_rate = dim_w <= 50 ? CFG.glue.small
+                  : dim_w <= 100 ? CFG.glue.mid
+                  : CFG.glue.large;
+  const cost_glue = qty * glue_rate;
+
+  const cost_uv_spot = services.uv_spot
+    ? parseNum(document.getElementById('cost_uv_spot_manual').value) : 0;
+  const cost_uv_film = services.uv_spot
+    ? parseNum(document.getElementById('cost_uv_film').value) : 0;
+
+  const total = cost_cardboard + cost_plate + cost_print + cost_ink
+              + cost_selfon + cost_foil
+              + cost_emboss + cost_emboss_plate
+              + cost_mold + cost_diecut
+              + cost_glue + cost_uv_spot + cost_uv_film;
+
+  // نمایش نتیجه
+  document.getElementById('result_total').textContent = fmt(total);
+
+  function setRow(id, val) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = fmt(val);
+    el.parentElement.className = 'breakdown-row' + (val === 0 ? ' zero' : '');
+  }
+
+  setRow('r_cardboard', cost_cardboard);
+  setRow('r_plate',     cost_plate);
+  setRow('r_print',     cost_print);
+  setRow('r_ink',       cost_ink);
+  setRow('r_selfon',    cost_selfon);
+  setRow('r_foil',      cost_foil);
+  setRow('r_emboss',    cost_emboss + cost_emboss_plate);
+  setRow('r_mold',      cost_mold);
+  setRow('r_diecut',    cost_diecut);
+  setRow('r_glue',      cost_glue);
+  setRow('r_uv_spot',   cost_uv_spot + cost_uv_film);
+
+  document.getElementById('i_sheets').textContent    = fmt(sheets);
+  document.getElementById('i_ink_count').textContent = fmt(ink_count);
+  document.getElementById('i_pallet').textContent    = fmt(Math.ceil(sheets / 500) * 500);
+
+  // نمایش باکس ذخیره سفارش
+  document.getElementById('save-order-area').style.display = 'block';
+
+  // تاریخ امروز به فارسی
+  const today = new Date();
+  const jalali = toJalali(today.getFullYear(), today.getMonth()+1, today.getDate());
+  document.getElementById('order_name').placeholder = 'نام سفارش — ' + jalali.y + '/' + String(jalali.m).padStart(2,'0') + '/' + String(jalali.d).padStart(2,'0');
+
+  // رفرش لیست
+  renderOrders();
+}
+
+// ===== تبدیل تاریخ میلادی به شمسی =====
+function toJalali(gy, gm, gd) {
+  const g_d_no = [31,28,31,30,31,30,31,31,30,31,30,31];
+  const j_d_no = [31,31,31,31,31,31,30,30,30,30,30,29];
+  let jy, jm, jd, g_y, g_m, gy2, days;
+  gy2 = (gm > 2) ? (gy+1) : gy;
+  days = 355666 + (365*gy) + ~~((gy2+3)/4) - ~~((gy2+99)/100) + ~~((gy2+399)/400) + gd;
+  for (g_m=0; g_m<gm-1; g_m++) days += g_d_no[g_m];
+  jy = -1595 + (33*~~(days/12053));
+  days %= 12053;
+  jy += 4*(~~(days/1461));
+  days %= 1461;
+  if (days > 365) { jy += ~~((days-1)/365); days = (days-1)%365; }
+  if (days < 186) { jm = 1+~~(days/31); jd = 1+(days%31); }
+  else { jm = 7+~~((days-186)/30); jd = 1+((days-186)%30); }
+  return {y:jy, m:jm, d:jd};
+}
+
+// ===== ذخیره سفارش =====
+function saveOrder() {
+  const nameInput = document.getElementById('order_name');
+  const today = new Date();
+  const jalali = toJalali(today.getFullYear(), today.getMonth()+1, today.getDate());
+  const dateStr = jalali.y + '/' + String(jalali.m).padStart(2,'0') + '/' + String(jalali.d).padStart(2,'0');
+  const name = nameInput.value.trim() || ('سفارش ' + dateStr);
+
+  const total = document.getElementById('result_total').textContent;
+  if (total === '—') { alert('ابتدا محاسبه کنید'); return; }
+
+  const order = {
+    id: Date.now(),
+    name: name,
+    date: dateStr,
+    total: total,
+    details: {
+      qty: document.getElementById('qty').value,
+      brand: document.getElementById('cardboard_brand').value,
+      machine: document.getElementById('machine').value,
+      colors: document.getElementById('colors').value,
+      cardboard: document.getElementById('r_cardboard').textContent,
+      plate: document.getElementById('r_plate').textContent,
+      print: document.getElementById('r_print').textContent,
+      ink: document.getElementById('r_ink').textContent,
+      selfon: document.getElementById('r_selfon').textContent,
+      foil: document.getElementById('r_foil').textContent,
+      diecut: document.getElementById('r_diecut').textContent,
+      glue: document.getElementById('r_glue').textContent,
+    }
+  };
+
+  let orders = [];
+  try { orders = JSON.parse(localStorage.getItem('printOrders') || '[]'); } catch(e){}
+  orders.unshift(order);
+  try { localStorage.setItem('printOrders', JSON.stringify(orders)); } catch(e){}
+
+  nameInput.value = '';
+  renderOrders();
+
+  // پیام تأیید
+  const btn = document.querySelector('#save-order-area button');
+  const orig = btn.textContent;
+  btn.textContent = '✅ ذخیره شد';
+  setTimeout(() => btn.textContent = orig, 2000);
+}
+
+// ===== نمایش لیست سفارشات =====
+function renderOrders() {
+  let orders = [];
+  try { orders = JSON.parse(localStorage.getItem('printOrders') || '[]'); } catch(e){}
+
+  const section = document.getElementById('saved-orders-section');
+  const list = document.getElementById('saved-orders-list');
+
+  if (orders.length === 0) { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+
+  list.innerHTML = orders.map(o => `
+    <div style="padding:10px 14px; border-bottom:1px solid var(--border);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+        <span style="font-size:14px; color:var(--text);">${o.name}</span>
+        <button onclick="deleteOrder(${o.id})" style="background:none; border:none; color:#555; font-size:16px; cursor:pointer; padding:0 4px;">🗑️</button>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-size:12px; color:var(--text-muted);">${o.date}</span>
+        <span style="font-size:14px; color:var(--gold); font-family:'Courier New',monospace; direction:ltr;">${o.total} ریال</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ===== حذف سفارش =====
+function deleteOrder(id) {
+  let orders = [];
+  try { orders = JSON.parse(localStorage.getItem('printOrders') || '[]'); } catch(e){}
+  orders = orders.filter(o => o.id !== id);
+  try { localStorage.setItem('printOrders', JSON.stringify(orders)); } catch(e){}
+  renderOrders();
+
+function resetForm() {
+  const pairs = [
+    ['qty','30,000'], ['colors','5'], ['dim_l','80'], ['dim_w','50'],
+    ['dim_h','120'], ['per_sheet','10'], ['foil_h','7'], ['foil_w','9'],
+    ['cost_diecut_mold','120,000,000'], ['cost_emboss_plate','200,000,000'],
+    ['cost_uv_film','50,000,000'], ['cost_emboss','100,000,000'],
+    ['cost_uv_spot_manual','0']
+  ];
+  pairs.forEach(([id, val]) => {
+    const el = document.getElementById(id);
+    if (el) el.value = val;
+  });
+  document.getElementById('result_total').textContent = '—';
+  ['r_cardboard','r_plate','r_print','r_ink','r_selfon','r_foil',
+   'r_emboss','r_mold','r_diecut','r_glue','r_uv_spot',
+   'i_sheets','i_ink_count','i_pallet']
+    .forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = '—';
+    });
+}
+
+// ===== init =====
+function init() {
+  loadSettingsFromStorage();
+  document.querySelectorAll('.num-input').forEach(bindNumInput);
+  calculate();
+  renderOrders();
+}
+
+init();
+</script>
+</body>
+</html>
